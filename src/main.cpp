@@ -266,6 +266,22 @@ static bool loadPalette(const char *path, const char *outpath, const char *outfi
 
     d_8to24table[255] &= LittleLong(0xffffff); /* 255 is transparent */
 
+    char fullpath[256];
+    sprintf(fullpath, "%s/%s", outpath, outfile);
+
+    FILE *ofile = fopen(fullpath, "wb");
+    if (!ofile) {
+        fprintf(stderr, "Failed to create %s\n", fullpath);
+        return false;
+    }
+
+    if (fwrite(palette, 768, 1, ofile) != 1) {
+        fprintf(stderr, "Failed to write %s\n", fullpath);
+        fclose(ofile);
+        return false;
+    }
+
+    fclose(ofile);
     return true;
 }
 
