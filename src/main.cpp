@@ -267,7 +267,7 @@ static bool loadPalette(const char *path, const char *outpath, const char *outfi
     d_8to24table[255] &= LittleLong(0xffffff); /* 255 is transparent */
 
     char fullpath[256];
-    sprintf(fullpath, "%s/%s", outpath, outfile);
+    snprintf(fullpath, 256, "%s/%s", outpath, outfile);
 
     FILE *ofile = fopen(fullpath, "wb");
     if (!ofile) {
@@ -623,49 +623,69 @@ static bool convertWal(const fileEntry& entry, const char *outPath) {
 
 int main(int argc, const char * argv[]) {
 
-    if (argc != 3) {
-        fprintf(stderr, "Usage q2unpack inpath outpath\n");
+    if (argc != 3 && argc != 4) {
+        fprintf(stderr, "Usage q2unpack [-nc] inpath outpath\n");
+        fprintf(stderr, " -nc: Do not convert to imagess\n");
         return 1;
     }
 
+    int arg_index = 1;
+    bool convert = true;
+    if (argc == 4)
+    {
+        if (strcmp(argv[1], "-nc") != 0) {
+            fprintf(stderr, "Usage q2unpack [-nc] inpath outpath\n");
+            fprintf(stderr, " -nc: Do not convert to imagess\n");
+            return 1;
+        }
+        arg_index = 2;
+        convert = false;
+    }
+
     char path[1024];
-    strncpy(path, argv[2], 1024);
+    strncpy(path, argv[arg_index + 1], 1024);
     char *d = &path[strlen(path)-1];
     if (*d != '/') {
         *(++d) = '/';
         *(++d) = 0;
     }
-    mkdir(argv[2], 0777);
+    mkdir(argv[arg_index + 1], 0777);
 
     char picspath[1024];
-    sprintf(picspath,"%s/pics", path);
+    sprintf(picspath,"%spics", path);
 
-    if (!readDir(argv[1], "")) {
+    if (!readDir(argv[arg_index], "")) {
         return 1;
     }
 
     printf("Files: %lu\n", entries.size());
-    if (!loadPalette("pics/colormap.pcx", picspath, "colormap.bin")) {
+    if (convert && !loadPalette("pics/colormap.pcx", picspath, "colormap.bin")) {
         return 1;
     }
 
     for (const fileEntry& entry : entries) {
         int len = int(strlen(entry.name));
-        if (strcmp(entry.name, "pics/colormap.pcx") == 0) { // We already handled this one
-        } else if (len > 4 && strcmp(&entry.name[len - 4], ".pcx") == 0) {
-            bool isSkin = strncmp(entry.name, "models", 6) == 0 || strncmp(entry.name, "players", 7) == 0;
-            if (!convertPcx(entry, path, isSkin)) {
-                return 1;
+        if (convert) {
+            if (strcmp(entry.name, "pics/colormap.pcx") == 0) { // We already handled this one
+            } else if (len > 4 && strcmp(&entry.name[len - 4], ".pcx") == 0) {
+                bool isSkin = strncmp(entry.name, "models", 6) == 0 || strncmp(entry.name, "players", 7) == 0;
+                if (!convertPcx(entry, path, isSkin)) {
+                    return 1;
+                }
+            } else if (len > 4 && strcmp(&entry.name[len - 4], ".wal") == 0) {
+                if (!convertWal(entry, path)) {
+                    return 1;
+                }
+            } else if (len > 4 && strcmp(&entry.name[len - 4], ".tga") == 0) {
+                // TODO!!!!
+                printf("TGA %s\n", entry.name);
+            } else {
+                // Just copy the rest of the files
+                if (!copyFile(entry, path)) {
+                    return 1;
+                }
             }
-        } else if (len > 4 && strcmp(&entry.name[len - 4], ".wal") == 0) {
-            if (!convertWal(entry, path)) {
-                return 1;
-            }
-        } else if (len > 4 && strcmp(&entry.name[len - 4], ".tga") == 0) {
-            // TODO!!!!
-            printf("TGA %s\n", entry.name);
         } else {
-            // Just copy the rest of the files
             if (!copyFile(entry, path)) {
                 return 1;
             }
